@@ -8,22 +8,31 @@ const {
   runHoroscopeScraper,
 } = require("./routes/horoscopeRouter");
 const newsRouter = require("./routes/newsRouter");
-// const stockRouter = require("./routes/stockRouter"); // ✅ import stock router
+// const stockRouter = require("./routes/stockRouter");
 // const financialRouter = require("./routes/financialRouter");
 
 const app = express();
-app.use(cors({ origin: "http://localhost:8080", credentials: true }));
+
+// Use CORS for all origins in production, allow localhost for local dev
+const origin =
+  process.env.NODE_ENV === "production"
+    ? "*" // Allow all origins in production
+    : "http://localhost:8080";
+
+app.use(cors({ origin, credentials: true }));
 app.use(express.json());
 
 app.use("/api/horoscope", horoscopeRouter);
 app.use("/api/news", newsRouter);
-// app.use("/api/stocks", stockRouter); // ✅ mount stock routes
+// app.use("/api/stocks", stockRouter);
 // app.use("/api/financials", financialRouter);
-const PORT = 3000;
+
+// Dynamic port for Render
+const PORT = process.env.PORT || 3000;
 const CACHE_FILE = path.join(__dirname, "routes/horoscopeCache.json");
 
 app.listen(PORT, async () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 
   if (!fs.existsSync(CACHE_FILE)) {
     try {
