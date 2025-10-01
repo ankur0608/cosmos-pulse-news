@@ -33,12 +33,12 @@ export const fetchNews = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             const featuredRes = await fetch(
-                "http://localhost:3000/api/news/top-headlines?limit=5"
+                "https://cosmos-pulse-news.onrender.com/api/news/top-headlines?limit=5"
             );
             const featuredData = await featuredRes.json();
 
             const generalRes = await fetch(
-                "http://localhost:3000/api/news?q=general&limit=20"
+                "https://cosmos-pulse-news.onrender.com/api/news?q=general&limit=20"
             );
             const generalData = await generalRes.json();
 

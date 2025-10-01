@@ -1,4 +1,3 @@
-// store/breakingNewsSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 
 const initialState = {
@@ -8,11 +7,9 @@ const initialState = {
 };
 
 // Use env variable with fallback
-const API_BASE_URL =
-    (typeof process !== "undefined" ? process.env.REACT_APP_BACKEND_URL : null) ||
-    "http://localhost:3000";
+const API_BASE_URL = "https://cosmos-pulse-news.onrender.com"
 
-// Async thunk to fetch breaking news
+
 export const fetchBreakingNews = createAsyncThunk(
     "breakingNews/fetchBreakingNews",
     async (_, { rejectWithValue }) => {
@@ -20,11 +17,10 @@ export const fetchBreakingNews = createAsyncThunk(
             const res = await fetch(`${API_BASE_URL}/api/news/latest`);
             const data = await res.json();
             if (data.success) {
-                const topStories = data.articles.slice(0, 5).map((article) => ({
+                return data.articles.slice(0, 5).map((article) => ({
                     title: article.title,
                     url: article.url,
                 }));
-                return topStories;
             }
             return [];
         } catch (err) {

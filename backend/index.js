@@ -29,6 +29,7 @@ app.use("/api/news", newsRouter);
 
 // Dynamic port for Render
 const PORT = process.env.PORT || 3000;
+
 const CACHE_FILE = path.join(__dirname, "routes/horoscopeCache.json");
 
 app.listen(PORT, async () => {
