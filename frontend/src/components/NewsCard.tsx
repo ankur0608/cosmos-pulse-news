@@ -1,24 +1,28 @@
 import { Clock, ArrowRight } from "lucide-react";
+import { format } from "date-fns"; // Recommended for consistent date formatting
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+// Interface updated to match the data model from the Redux slice
 interface NewsCardProps {
   title: string;
-  summary: string;
-  category: string;
+  description: string; // Changed from 'summary'
+  source: string; // Changed from 'category'
   author: string;
+  url: string; // Added URL for navigation
   publishedAt: string;
   imageUrl?: string;
-  isBreaking?: boolean; // For top breaking news
-  isLive?: boolean; // Optional live status
+  isBreaking?: boolean;
+  isLive?: boolean;
   size?: "default" | "large" | "small";
 }
 
 const NewsCard = ({
   title,
-  summary,
-  category,
+  description, // Use 'description'
+  source, // Use 'source'
   author,
+  url,
   publishedAt,
   imageUrl,
   isBreaking = false,
@@ -31,11 +35,19 @@ const NewsCard = ({
     large: "col-span-1 md:col-span-3",
   };
 
+  // Format the date for a clean, consistent look
+  const formattedDate = format(new Date(publishedAt), "MMM d, yyyy h:mm a");
+
+  const handleClick = () => {
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <Card
-      className={`${sizeClasses[size]} group cursor-pointer hover:shadow-lg transition-all duration-300 border-news-border`}
+      onClick={handleClick}
+      className={`${sizeClasses[size]} group cursor-pointer hover:shadow-lg transition-all duration-300 border-news-border flex flex-col`}
     >
-      <CardContent className="p-0">
+      <CardContent className="p-0 flex flex-col flex-grow">
         {imageUrl && (
           <div className="relative overflow-hidden">
             <img
@@ -57,17 +69,17 @@ const NewsCard = ({
           </div>
         )}
 
-        <div className="p-4">
+        <div className="p-4 flex flex-col flex-grow">
           <div className="flex items-center justify-between mb-2">
             <Badge
               variant="outline"
               className="text-category-tag border-category-tag"
             >
-              {category.toUpperCase()}
+              {source?.toUpperCase() || "GENERAL"} {/* Use 'source' prop */}
             </Badge>
             <div className="flex items-center text-xs text-muted-foreground">
               <Clock className="h-3 w-3 mr-1" />
-              {new Date(publishedAt).toLocaleString()} {/* format nicely */}
+              {formattedDate} {/* Display formatted date */}
             </div>
           </div>
 
@@ -88,10 +100,10 @@ const NewsCard = ({
               size === "large" ? "text-base" : "text-sm"
             }`}
           >
-            {summary}
+            {description} {/* Use 'description' prop */}
           </p>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mt-auto pt-2">
             <span className="text-xs text-muted-foreground">
               By {author || "Unknown"}
             </span>

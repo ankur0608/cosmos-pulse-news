@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "@/store";
 import { fetchNews, NewsItem } from "@/store/newsSlice";
 
-// 1. Import the Autoplay plugin
 import Autoplay from "embla-carousel-autoplay";
 
 import BreakingNews from "@/components/BreakingNews";
@@ -34,14 +33,17 @@ const Index = () => {
   ];
 
   useEffect(() => {
-    dispatch(fetchNews());
-  }, [dispatch]);
+    // Fetch news only if articles array is empty
+    if (articles.length === 0) {
+      dispatch(fetchNews());
+    }
+  }, [dispatch, articles.length]);
 
   if (loading) return <p className="text-center py-10">Loading news...</p>;
   if (error) return <p className="text-center py-10 text-red-500">{error}</p>;
 
-  // Use the first 5 articles for the featured carousel
   const featuredArticles = articles.slice(0, 5);
+  const mainGridArticles = articles.slice(5); // Avoid repeating featured articles
 
   return (
     <main className="container mx-auto px-4 py-6 flex-1">
@@ -54,30 +56,31 @@ const Index = () => {
             Featured Stories
           </h2>
 
-          {/* 2. Add the plugins and opts props to the Carousel */}
           <Carousel
             plugins={[
               Autoplay({
-                delay: 5000, // Set the delay to 5 seconds
-                stopOnInteraction: true, // Stop autoplay on user interaction
+                delay: 5000,
+                stopOnInteraction: true,
               }),
             ]}
             opts={{
-              loop: true, // Enable looping for a continuous effect
+              loop: true,
             }}
           >
             <CarouselPrevious />
             <CarouselContent>
-              {/* 3. Map over multiple articles to make autoplay visible */}
-              {featuredArticles.map((news: NewsItem, index: number) => (
-                <CarouselItem key={index}>
+              {featuredArticles.map((news: NewsItem) => (
+                // Use a unique key instead of index for better performance
+                <CarouselItem key={news.url}>
+                  {/* Pass props that match the updated NewsCard component */}
                   <NewsCard
                     title={news.title}
-                    summary={news.description}
-                    category={news.source || "General"}
+                    description={news.description}
+                    source={news.source || "General"}
                     author={news.author || "Unknown"}
                     publishedAt={news.publishedAt}
                     imageUrl={news.imageUrl || newsroomHero}
+                    url={news.url}
                     size="large"
                   />
                 </CarouselItem>
@@ -92,15 +95,18 @@ const Index = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            {articles.map((news: NewsItem, index: number) => (
+            {mainGridArticles.map((news: NewsItem) => (
+              // Use a unique key instead of index
               <NewsCard
-                key={index}
+                key={news.url}
+                // Pass props that match the updated NewsCard component
                 title={news.title}
-                summary={news.description}
-                category={news.source || "General"}
+                description={news.description}
+                source={news.source || "General"}
                 author={news.author || "Unknown"}
                 publishedAt={news.publishedAt}
                 imageUrl={news.imageUrl || newsroomHero}
+                url={news.url}
                 size="small"
               />
             ))}

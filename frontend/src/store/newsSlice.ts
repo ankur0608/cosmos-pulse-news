@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import API_BASE_URL from "./apiConfig";
+
 
 export type NewsItem = {
     title: string;
@@ -32,13 +34,14 @@ export const fetchNews = createAsyncThunk(
     "news/fetchNews",
     async (_, { rejectWithValue }) => {
         try {
+            // Use the imported, environment-aware base URL for both calls
             const featuredRes = await fetch(
-                "https://cosmos-pulse-news.onrender.com/api/news/top-headlines?limit=5"
+                `${API_BASE_URL}/news/top-headlines?limit=5`    
             );
             const featuredData = await featuredRes.json();
 
             const generalRes = await fetch(
-                "https://cosmos-pulse-news.onrender.com/api/news?q=general&limit=20"
+                `${API_BASE_URL}/news?q=general&limit=20`
             );
             const generalData = await generalRes.json();
 
