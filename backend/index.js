@@ -1,10 +1,13 @@
-// server.js
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const cron = require("node-cron"); // ✅ Import cron
 
-const { router: horoscopeRouter, runHoroscopeScraper } = require("./routes/horoscopeRouter");
+const {
+  router: horoscopeRouter,
+  runHoroscopeScraper,
+} = require("./routes/horoscopeRouter");
 const newsRouter = require("./routes/newsRouter");
 // const stockRouter = require("./routes/stockRouter");
 // const financialRouter = require("./routes/financialRouter");
@@ -12,15 +15,17 @@ const newsRouter = require("./routes/newsRouter");
 const app = express();
 
 // ------------------ CORS ------------------
-// Allow localhost for dev, and frontend URL(s) for production
-const allowedOrigins = process.env.NODE_ENV === "production"
-  ? ["https://cosmos-pulse-news.vercel.app"] // frontend production
-  : ["http://localhost:8080"]; // local dev
+const allowedOrigins =
+  process.env.NODE_ENV === "production"
+    ? ["https://cosmos-pulse-news.vercel.app"]
+    : ["http://localhost:8080"];
 
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
 
 // ------------------ Middleware ------------------
 app.use(express.json());
@@ -60,4 +65,21 @@ app.listen(PORT, async () => {
   } else {
     console.log("🟢 Horoscope cache exists. Skipping scraper.");
   }
+
+  // ------------------ Schedule Scraper (12:00 AM daily) ------------------
+  cron.schedule(
+    "0 0 * * *",
+    async () => {
+      try {
+        console.log("🕛 Running daily horoscope scraper at 12:00 AM...");
+        await runHoroscopeScraper();
+        console.log("✅ Horoscope data refreshed successfully.");
+      } catch (err) {
+        console.error("❌ Error refreshing horoscope data:", err.message);
+      }
+    },
+    {
+      timezone: "Asia/Kolkata", // ✅ set timezone (important for India!)
+    }
+  );
 });

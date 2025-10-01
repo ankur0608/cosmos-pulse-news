@@ -13,6 +13,8 @@ import NotFound from "./pages/NotFound";
 import Weather from "./pages/Weather";
 import ZodiacIndex from "./pages/horoscope/ZodiacIndex";
 import ZodiacDetailPage from "./pages/horoscope/ZodiacDetailPage";
+import IndiaPage from "./pages/IndiaPage";
+import SportsPage from "./pages/sports";
 
 const queryClient = new QueryClient();
 
@@ -29,7 +31,10 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             {/* <Route path="/markets" element={<Markets />} /> */}
+            <Route path="/india" element={<IndiaPage />} />
             <Route path="/horoscope" element={<ZodiacIndex />} />
+            <Route path="/Sports" element={<SportsPage />} />
+
             <Route path="/horoscope/:sign" element={<ZodiacDetailPage />} />
             <Route path="/weather" element={<Weather />} />
           </Route>

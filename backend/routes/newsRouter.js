@@ -3,171 +3,210 @@ const express = require("express");
 const fetch = require("node-fetch");
 const router = express.Router();
 
-// --- API Keys (use env vars in production) ---
-const newsAPIKey =
-  process.env.NEWSAPI_KEY || "a13409cf0f9e419c92433e842c29639c";
-const gnewsAPIKey = process.env.GNEWS_KEY || "e64e1672020362c16a3e3fce5f2c0e3f";
-const mediastackKey =
-  process.env.MEDIASTACK_KEY || "38e76a6bedfb87de79610bba6e4baa13";
+// --- Constants ---
+const TOP_HEADLINES_QUERY = "top-headlines";
+
+// --- Helper Functions ---
+
+/**
+ * @description Creates a date string for the past N days in YYYY-MM-DD format.
+ * @param {number} daysAgo - How many days back to set the date.
+ * @returns {string} The formatted date string (e.g., "2025-09-24").
+ */
+function getPastDate(daysAgo) {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return date.toISOString().split("T")[0];
+}
+
+const sevenDaysAgo = getPastDate(7);
+
+// --- API Configuration ---
+const apiSources = [
+  {
+    name: "NewsAPI",
+    enabled: true,
+    buildUrl: (query) => {
+      const apiKey = process.env.NEWS_API_KEY;
+      const encodedQuery = encodeURIComponent(query);
+      if (query === TOP_HEADLINES_QUERY) {
+        return `https://newsapi.org/v2/top-headlines?country=in&apiKey=${apiKey}`;
+      }
+      return `https://newsapi.org/v2/everything?q=${encodedQuery}&language=en&from=${sevenDaysAgo}&sortBy=publishedAt&apiKey=${apiKey}`;
+    },
+    normalize: (data) =>
+      (data.articles || []).map((a) => ({
+        title: a.title,
+        description: a.description,
+        url: a.url,
+        source: a.source?.name || "Unknown",
+        publishedAt: a.publishedAt,
+        imageUrl: a.urlToImage,
+      })),
+  },
+  {
+    name: "GNews",
+    enabled: true,
+    buildUrl: (query) => {
+      const apiKey = process.env.GNEWS_API_KEY;
+      const encodedQuery = encodeURIComponent(query);
+      if (query === TOP_HEADLINES_QUERY) {
+        return `https://gnews.io/api/v4/top-headlines?country=in&lang=en&token=${apiKey}`;
+      }
+      return `https://gnews.io/api/v4/search?q=${encodedQuery}&lang=en&from=${new Date(
+        sevenDaysAgo
+      ).toISOString()}&token=${apiKey}`;
+    },
+    normalize: (data) =>
+      (data.articles || []).map((a) => ({
+        title: a.title,
+        description: a.description,
+        url: a.url,
+        source: a.source?.name || "Unknown",
+        publishedAt: a.publishedAt,
+        imageUrl: a.image,
+      })),
+  },
+  {
+    name: "Mediastack",
+    enabled: true,
+    buildUrl: (query) => {
+      const apiKey = process.env.MEDIASTACK_API_KEY;
+      const encodedQuery = encodeURIComponent(query);
+      return `http://api.mediastack.com/v1/news?access_key=${apiKey}&keywords=${encodedQuery}&languages=en&date=${sevenDaysAgo},${getPastDate(
+        0
+      )}`;
+    },
+    normalize: (data) =>
+      (data.data || []).map((a) => ({
+        title: a.title,
+        description: a.description,
+        url: a.url,
+        source: a.source || "Unknown",
+        publishedAt: a.published_at,
+        imageUrl: a.image,
+      })),
+  },
+];
 
 // --- In-memory cache ---
-let cache = {};
+const cache = {};
 const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 
-// --- Safe fetch helper ---
+// --- Core Logic ---
+
+/**
+ * @description Fetches data from a URL with a timeout and handles errors gracefully.
+ * @param {string} url - The URL to fetch.
+ * @returns {Promise<object|null>} The JSON response or null if an error occurs.
+ */
 async function safeFetch(url) {
   try {
     const res = await fetch(url, { timeout: 15000 });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
     return await res.json();
   } catch (err) {
-    console.error(`❌ Fetch failed: ${url} → ${err.message}`);
+    console.error(`❌ Fetch failed: ${err.message}`);
     return null;
   }
 }
 
-// --- Core fetch function ---
+/**
+ * @description Fetches, aggregates, and processes news from multiple API sources.
+ * @param {string} query - The search query or topic.
+ * @returns {Promise<Array<object>>} A sorted and deduplicated array of news articles.
+ */
 async function fetchAllNews(query = "general") {
   const now = Date.now();
-  if (cache[query] && now - cache[query].timestamp < CACHE_TTL) {
-    return cache[query].articles;
+  const cacheKey = query.toLowerCase();
+
+  if (cache[cacheKey] && now - cache[cacheKey].timestamp < CACHE_TTL) {
+    console.log(`CACHE HIT for query: "${cacheKey}"`);
+    return cache[cacheKey].articles;
   }
+  console.log(`CACHE MISS for query: "${cacheKey}"`);
 
-  const urls = [
-    `https://newsapi.org/v2/everything?q=${query}&apiKey=${newsAPIKey}`,
-    `https://gnews.io/api/v4/search?q=${query}&token=${gnewsAPIKey}`,
-    `http://api.mediastack.com/v1/news?access_key=${mediastackKey}&keywords=${query}&languages=en`,
-  ];
+  try {
+    const activeSources = apiSources.filter(
+      (s) => s.enabled && process.env[s.name.toUpperCase() + "_API_KEY"]
+    );
+    const fetchPromises = activeSources.map((source) =>
+      safeFetch(source.buildUrl(query))
+    );
+    const responses = await Promise.all(fetchPromises);
 
-  const data = await Promise.all(urls.map((u) => safeFetch(u)));
+    const articles = responses.flatMap((data, index) => {
+      if (!data) return [];
+      return activeSources[index].normalize(data);
+    });
 
-  const articles = data.flatMap((d, idx) => {
-    if (!d) return [];
-    switch (idx) {
-      case 0: // NewsAPI
-        return (d.articles || []).map((a) => ({
-          title: a.title,
-          description: a.description,
-          url: a.url,
-          source: a.source?.name || "Unknown",
-          publishedAt: a.publishedAt,
-          imageUrl: a.urlToImage,
-        }));
-      case 1: // GNews
-        return (d.articles || []).map((a) => ({
-          title: a.title,
-          description: a.description,
-          url: a.url,
-          source: a.source?.name || "Unknown",
-          publishedAt: a.publishedAt,
-          imageUrl: a.image,
-        }));
-      case 2: // Mediastack
-        return (d.data || []).map((a) => ({
-          title: a.title,
-          description: a.description,
-          url: a.url,
-          source: a.source || "Unknown",
-          publishedAt: a.published_at,
-          imageUrl: a.image,
-        }));
-      default:
-        return [];
-    }
-  });
+    const seenUrls = new Set();
+    const uniqueArticles = articles.filter((a) => {
+      if (!a || !a.url || !a.title || seenUrls.has(a.url)) return false;
+      seenUrls.add(a.url);
+      return true;
+    });
 
-  // Remove duplicates by URL
-  const seen = new Set();
-  const uniqueArticles = articles.filter((a) => {
-    if (seen.has(a.url)) return false;
-    seen.add(a.url);
-    return true;
-  });
+    uniqueArticles.sort(
+      (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)
+    );
 
-  // Sort newest first
-  uniqueArticles.sort(
-    (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)
-  );
-
-  // Save to cache
-  cache[query] = { articles: uniqueArticles, timestamp: now };
-
-  return uniqueArticles;
+    cache[cacheKey] = { articles: uniqueArticles, timestamp: now };
+    return uniqueArticles;
+  } catch (error) {
+    console.error(`Error processing news for query "${query}":`, error);
+    return [];
+  }
 }
 
-// --- Routes ---
-
-// GET /api/news?q=keyword&limit=20
-router.get("/", async (req, res) => {
-  const query = req.query.q || "general";
-  const limit = parseInt(req.query.limit, 10) || 20;
+/**
+ * @description A helper function to handle the common logic for all news routes.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ * @param {() => string} getQuery - A function that returns the query string for fetchAllNews.
+ */
+async function handleNewsRequest(req, res, getQuery) {
   try {
+    const query = getQuery(req);
+    const limit = parseInt(req.query.limit, 10) || 20;
     const news = await fetchAllNews(query);
     res.json({ success: true, articles: news.slice(0, limit) });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Failed to fetch news" });
-  }
-});
-
-// GET /api/news/top-headlines?limit=10
-router.get("/top-headlines", async (req, res) => {
-  const limit = parseInt(req.query.limit, 10) || 10;
-  try {
-    const news = await fetchAllNews("top-headlines");
-    res.json({ success: true, articles: news.slice(0, limit) });
-  } catch (err) {
-    console.error(err);
+    console.error("Route handler error:", err);
     res
       .status(500)
-      .json({ success: false, message: "Failed to fetch top headlines" });
+      .json({ success: false, message: "Server error fetching news." });
   }
+}
+
+// --- API Routes ---
+
+router.get("/", (req, res) => {
+  handleNewsRequest(req, res, (request) => request.query.q || "general");
 });
 
-// GET /api/news/latest?limit=10
-router.get("/latest", async (req, res) => {
-  const limit = parseInt(req.query.limit, 10) || 10;
-  try {
-    const news = await fetchAllNews("general");
-    res.json({ success: true, articles: news.slice(0, limit) });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch latest news" });
-  }
+router.get("/top-headlines", (req, res) => {
+  handleNewsRequest(req, res, () => TOP_HEADLINES_QUERY);
 });
 
-// GET /api/news/source/:sourceName?limit=10
-router.get("/source/:sourceName", async (req, res) => {
-  const sourceName = req.params.sourceName.toLowerCase();
-  const limit = parseInt(req.query.limit, 10) || 10;
-  try {
-    const news = await fetchAllNews();
-    const filtered = news.filter((a) => a.source.toLowerCase() === sourceName);
-    res.json({ success: true, articles: filtered.slice(0, limit) });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch news by source" });
+router.get("/search", (req, res) => {
+  const keyword = req.query.q;
+  if (!keyword) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Search query 'q' is required" });
   }
+  handleNewsRequest(req, res, (request) => request.query.q);
 });
 
-router.get("/search", async (req, res) => {
-  const keyword = (req.query.q || "").toLowerCase();
-  const limit = parseInt(req.query.limit, 10) || 10;
-
-  try {
-    const news = await fetchAllNews();
-    const filtered = news.filter((a) =>
-      a.title.toLowerCase().includes(keyword)
-    );
-    res.json({ success: true, articles: filtered.slice(0, limit) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Failed to search news" });
+router.get("/category/:categoryName", (req, res) => {
+  const { categoryName } = req.params;
+  if (!categoryName) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Category name is required." });
   }
+  handleNewsRequest(req, res, (request) => request.params.categoryName);
 });
 
 module.exports = router;
