@@ -9,12 +9,16 @@ import Index from "./pages/Index";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
-// import Markets from "./pages/Markets";
 import Weather from "./pages/Weather";
 import ZodiacIndex from "./pages/horoscope/ZodiacIndex";
 import ZodiacDetailPage from "./pages/horoscope/ZodiacDetailPage";
 import IndiaPage from "./pages/IndiaPage";
-import SportsPage from "./pages/sports";
+import SportsPage from "./pages/SportsPage";
+import HealthPage from "./pages/HealthPage";
+import BusinessPage from "./pages/BusinessPage";
+import EntertainmentPage from "./pages/EntertainmentPage";
+import TechnologyPage from "./pages/TechnologyPage";
+import World from "./pages/World";
 
 const queryClient = new QueryClient();
 
@@ -30,13 +34,17 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
-            {/* <Route path="/markets" element={<Markets />} /> */}
             <Route path="/india" element={<IndiaPage />} />
-            <Route path="/horoscope" element={<ZodiacIndex />} />
-            <Route path="/Sports" element={<SportsPage />} />
+            <Route path="/sports" element={<SportsPage />} />
+            <Route path="/health" element={<HealthPage />} />
+            <Route path="/world" element={<World />} />
 
-            <Route path="/horoscope/:sign" element={<ZodiacDetailPage />} />
+            <Route path="/business" element={<BusinessPage />} />
+            <Route path="/entertainment" element={<EntertainmentPage />} />
+            <Route path="/technology" element={<TechnologyPage />} />
             <Route path="/weather" element={<Weather />} />
+            <Route path="/horoscope" element={<ZodiacIndex />} />
+            <Route path="/horoscope/:sign" element={<ZodiacDetailPage />} />
           </Route>
 
           {/* Catch-all */}

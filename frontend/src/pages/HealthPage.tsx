@@ -5,7 +5,7 @@ import { fetchNewsByCategory, NewsItem } from "@/store/newsSlice";
 import NewsCard from "@/components/NewsCard";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Skeleton loader for the page
+// Skeleton loader
 const PageSkeleton: React.FC = () => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     {Array.from({ length: 9 }).map((_, i) => (
@@ -20,35 +20,36 @@ const PageSkeleton: React.FC = () => (
   </div>
 );
 
-const IndiaPage: React.FC = () => {
+const HealthPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { articles, loading, error } = useSelector(
     (state: RootState) => state.news
   );
 
   useEffect(() => {
-    dispatch(fetchNewsByCategory("India"));
+    // Fetch health news category
+    dispatch(fetchNewsByCategory("Health"));
   }, [dispatch]);
 
   return (
     <main className="container mx-auto px-4 py-8">
-      {/* Header */}
+      {/* Page header */}
       <div className="border-b-2 border-primary pb-2 mb-6">
         <h1 className="text-4xl font-serif font-bold text-foreground">
-          India News
+          Health News
         </h1>
         <p className="text-muted-foreground mt-1">
-          The latest top headlines from India.
+          The latest top headlines from the health world.
         </p>
       </div>
 
-      {/* Loading state */}
+      {/* Loading */}
       {loading && <PageSkeleton />}
 
-      {/* Error state */}
+      {/* Error */}
       {error && <p className="text-center text-destructive py-10">{error}</p>}
 
-      {/* Articles grid */}
+      {/* Articles */}
       {!loading && !error && articles.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {articles.map((article: NewsItem) => (
@@ -57,9 +58,9 @@ const IndiaPage: React.FC = () => {
               title={article.title}
               description={article.description}
               source={article.source}
-              author={article.author} // already defaulted in slice
+              author={article.author}
               publishedAt={article.publishedAt}
-              imageUrl={article.imageUrl} // already defaulted in slice
+              imageUrl={article.imageUrl}
               url={article.url}
               size="small"
             />
@@ -67,14 +68,14 @@ const IndiaPage: React.FC = () => {
         </div>
       )}
 
-      {/* No articles found */}
+      {/* No articles */}
       {!loading && !error && articles.length === 0 && (
         <p className="text-center py-10 text-muted-foreground">
-          No news articles available.
+          No health news articles available.
         </p>
       )}
     </main>
   );
 };
 
-export default IndiaPage;
+export default HealthPage;

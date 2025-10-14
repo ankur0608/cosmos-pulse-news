@@ -126,7 +126,7 @@ const FeaturedSlider = React.memo(({ articles }: FeaturedSliderProps) => (
             <NewsCard
               title={news.title}
               description={news.description}
-              source={"General"}
+              source={news.source?.name || "General"}
               author={news.author || "Unknown"}
               publishedAt={news.publishedAt}
               // FIXED: Changed from news.urlToImage to news.imageUrl to match your API data

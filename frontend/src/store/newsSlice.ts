@@ -1,113 +1,123 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import API_BASE_URL from "./apiConfig";
 
-// The NewsItem type remains the same. The backend normalizes all sources into this structure.
+// 1️⃣ Article type
 export type NewsItem = {
     title: string;
     description: string;
     url: string;
-    author?: string;
-    source: string; // Backend ensures this is a string (e.g., "Forbes")
+    author: string;
+    source: string;
     publishedAt: string;
-    imageUrl?: string;
+    imageUrl: string;
 };
 
-// The state structure is unchanged.
-type NewsState = {
+// 2️⃣ Slice state type
+interface NewsState {
     articles: NewsItem[];
     loading: boolean;
     error: string | null;
-};
+}
 
+// 3️⃣ Initial state
 const initialState: NewsState = {
     articles: [],
     loading: false,
     error: null,
 };
 
-// --- ASYNC THUNKS ---
+// --- Thunks ---
 
-/**
- * 1. This thunk for the homepage remains unchanged.
- */
-export const fetchNews = createAsyncThunk(
+// Homepage top headlines
+export const fetchNews = createAsyncThunk<NewsItem[], void, { rejectValue: string }>(
     "news/fetchNews",
     async (_, { rejectWithValue }) => {
         try {
-            const response = await fetch(
-                `${API_BASE_URL}/news/top-headlines?limit=25`
-            );
-            if (!response.ok) {
-                throw new Error(`Server responded with status: ${response.status}`);
-            }
-            const data = await response.json();
-            return data.success
-                ? data.articles
-                : rejectWithValue(data.message || "Failed to fetch news articles.");
-        } catch (err: any) {
-            return rejectWithValue(err.message || "An unknown error occurred");
+            const response = await fetch(`${API_BASE_URL}/news/top-headlines?limit=25`);
+            if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
+            const data: { success: boolean; articles: Array<Partial<NewsItem>>; message?: string } =
+                await response.json();
+
+            if (!data.success) return rejectWithValue(data.message || "Failed to fetch news");
+
+            return data.articles.map((article) => ({
+                title: article.title || "No title",
+                description: article.description || "No description",
+                url: article.url || "#",
+                source: article.source || "Unknown",
+                author: article.author || "Unknown",
+                publishedAt: article.publishedAt || new Date().toISOString(),
+                imageUrl: article.imageUrl || "/placeholder-image.png",
+            }));
+        } catch (error) {
+            return rejectWithValue((error as Error).message || "Unknown error occurred");
         }
     }
 );
 
-/**
- * 2. NEW thunk for fetching news by a specific category.
- */
-export const fetchNewsByCategory = createAsyncThunk(
-    "news/fetchByCategory",
-    async (category: string, { rejectWithValue }) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/news/category/${category}`);
-            if (!response.ok) {
-                throw new Error(`Server responded with status: ${response.status}`);
-            }
-            const data = await response.json();
+// Fetch news by category
+export const fetchNewsByCategory = createAsyncThunk<
+    NewsItem[],
+    string,
+    { rejectValue: string }
+>("news/fetchNewsByCategory", async (category, { rejectWithValue }) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/news/category/${category}`);
+        if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
 
-            // ✅ Backend returns a plain array for categories
-            if (Array.isArray(data)) {
-                return data;
-            }
+        const data: { success: boolean; articles: Array<Partial<NewsItem>> } = await response.json();
 
+        if (!data.success || !Array.isArray(data.articles)) {
             return rejectWithValue("Invalid response format from server");
-        } catch (err: any) {
-            return rejectWithValue(err.message || "An unknown error occurred");
         }
-    }
-);
 
+        return data.articles.map((article) => ({
+            title: article.title || "No title",
+            description: article.description || "No description",
+            url: article.url || "#",
+            source: article.source || "Unknown",
+            author: article.author || "Unknown",
+            publishedAt: article.publishedAt || new Date().toISOString(),
+            imageUrl: article.imageUrl || "/placeholder-image.png",
+        }));
+    } catch (error) {
+        return rejectWithValue((error as Error).message || "Unknown error occurred");
+    }
+});
+
+// --- Slice ---
 const newsSlice = createSlice({
     name: "news",
     initialState,
     reducers: {},
     extraReducers: (builder) => {
         builder
-            // --- Cases for fetchNews (Homepage) ---
+            // fetchNews
             .addCase(fetchNews.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(fetchNews.fulfilled, (state, action) => {
+            .addCase(fetchNews.fulfilled, (state, action: PayloadAction<NewsItem[]>) => {
                 state.articles = action.payload;
                 state.loading = false;
             })
             .addCase(fetchNews.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.payload as string;
+                state.error = action.payload || "Failed to fetch news";
             })
 
-            // --- NEW cases for fetchNewsByCategory ---
+            // fetchNewsByCategory
             .addCase(fetchNewsByCategory.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(fetchNewsByCategory.fulfilled, (state, action) => {
-                // This action also updates the same 'articles' array.
+            .addCase(fetchNewsByCategory.fulfilled, (state, action: PayloadAction<NewsItem[]>) => {
                 state.articles = action.payload;
                 state.loading = false;
             })
             .addCase(fetchNewsByCategory.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.payload as string;
+                state.error = action.payload || "Failed to fetch news";
             });
     },
 });
