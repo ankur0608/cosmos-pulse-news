@@ -1,8 +1,11 @@
+// index.js
+require('dotenv').config(); 
+
 const express = require("express");
-const cors = require("cors");
+const cors =require("cors");
 const fs = require("fs");
 const path = require("path");
-const cron = require("node-cron"); // ✅ Import cron
+const cron = require("node-cron");
 
 const {
   router: horoscopeRouter,
@@ -15,14 +18,30 @@ const newsRouter = require("./routes/newsRouter");
 const app = express();
 
 // ------------------ CORS ------------------
+// Allow multiple frontend origins (Vercel production + localhost dev)
 const allowedOrigins =
   process.env.NODE_ENV === "production"
     ? ["https://cosmos-pulse-news.vercel.app"]
-    : ["http://localhost:8080"];
+    : ["http://localhost:3000", "http://localhost:8080"];
+
+// --- ADDED CONSOLE LOGS FOR DEBUGGING ---
+console.log("--- Environment Debug ---");
+console.log("NODE_ENV:", process.env.NODE_ENV);
+console.log("Allowed Origins:", allowedOrigins);
+console.log("News API Key Loaded:", process.env.NEWS_API_KEY ? "Yes" : "No - CHECK .env FILE");
+console.log("---------------------------");
+// ----------------------------------------
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like Postman) or if origin is allowed
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS policy: origin ${origin} not allowed`));
+      }
+    },
     credentials: true,
   })
 );
@@ -66,12 +85,13 @@ app.listen(PORT, async () => {
     console.log("🟢 Horoscope cache exists. Skipping scraper.");
   }
 
-  // ------------------ Schedule Scraper (12:00 AM daily) ------------------
+  // ------------------ Schedule Scraper (12:00 AM & 5:00 AM daily) ------------------
   cron.schedule(
-    "0 0 * * *",
+    "0 0,5 * * *", // <-- THIS IS THE CHANGE (Runs at 12:00 AM and 5:00 AM)
     async () => {
       try {
-        console.log("🕛 Running daily horoscope scraper at 12:00 AM...");
+        // I also updated the log message to be more general
+        console.log("🕛 Running scheduled horoscope scraper..."); 
         await runHoroscopeScraper();
         console.log("✅ Horoscope data refreshed successfully.");
       } catch (err) {
@@ -79,7 +99,7 @@ app.listen(PORT, async () => {
       }
     },
     {
-      timezone: "Asia/Kolkata", // ✅ set timezone (important for India!)
+      timezone: "Asia/Kolkata",
     }
   );
 });

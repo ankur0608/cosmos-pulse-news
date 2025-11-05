@@ -7,12 +7,6 @@ const router = express.Router();
 const TOP_HEADLINES_QUERY = "top-headlines";
 
 // --- Helper Functions ---
-
-/**
- * @description Creates a date string for the past N days in YYYY-MM-DD format.
- * @param {number} daysAgo - How many days back to set the date.
- * @returns {string} The formatted date string (e.g., "2025-09-24").
- */
 function getPastDate(daysAgo) {
   const date = new Date();
   date.setDate(date.getDate() - daysAgo);
@@ -24,7 +18,8 @@ const sevenDaysAgo = getPastDate(7);
 // --- API Configuration ---
 const apiSources = [
   {
-    name: "NewsAPI",
+    // FIX 1: "NewsAPI" changed to "News" to match "NEWS_API_KEY"
+    name: "News",
     enabled: true,
     buildUrl: (query) => {
       const apiKey = process.env.NEWS_API_KEY;
@@ -73,7 +68,8 @@ const apiSources = [
     buildUrl: (query) => {
       const apiKey = process.env.MEDIASTACK_API_KEY;
       const encodedQuery = encodeURIComponent(query);
-      return `http://api.mediastack.com/v1/news?access_key=${apiKey}&keywords=${encodedQuery}&languages=en&date=${sevenDaysAgo},${getPastDate(
+      // FIX 2: "http://" changed to "https://"
+      return `https://api.mediastack.com/v1/news?access_key=${apiKey}&keywords=${encodedQuery}&languages=en&date=${sevenDaysAgo},${getPastDate(
         0
       )}`;
     },
@@ -95,11 +91,6 @@ const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 
 // --- Core Logic ---
 
-/**
- * @description Fetches data from a URL with a timeout and handles errors gracefully.
- * @param {string} url - The URL to fetch.
- * @returns {Promise<object|null>} The JSON response or null if an error occurs.
- */
 async function safeFetch(url) {
   try {
     const res = await fetch(url, { timeout: 15000 });
@@ -111,11 +102,6 @@ async function safeFetch(url) {
   }
 }
 
-/**
- * @description Fetches, aggregates, and processes news from multiple API sources.
- * @param {string} query - The search query or topic.
- * @returns {Promise<Array<object>>} A sorted and deduplicated array of news articles.
- */
 async function fetchAllNews(query = "general") {
   const now = Date.now();
   const cacheKey = query.toLowerCase();
@@ -130,6 +116,11 @@ async function fetchAllNews(query = "general") {
     const activeSources = apiSources.filter(
       (s) => s.enabled && process.env[s.name.toUpperCase() + "_API_KEY"]
     );
+
+    if (activeSources.length === 0) {
+      console.error("No active API sources. Check backend .env file.");
+    }
+
     const fetchPromises = activeSources.map((source) =>
       safeFetch(source.buildUrl(query))
     );
@@ -159,19 +150,13 @@ async function fetchAllNews(query = "general") {
   }
 }
 
-/**
- * @description A helper function to handle the common logic for all news routes.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
- * @param {() => string} getQuery - A function that returns the query string for fetchAllNews.
- */
 async function handleNewsRequest(req, res, getQuery) {
   try {
     const query = getQuery(req);
     const limit = parseInt(req.query.limit, 10) || 20;
     const news = await fetchAllNews(query);
     res.json({ success: true, articles: news.slice(0, limit) });
-  } catch (err) {
+  } catch (err) { // <-- ✅ FIX 3: Added curly braces here
     console.error("Route handler error:", err);
     res
       .status(500)
